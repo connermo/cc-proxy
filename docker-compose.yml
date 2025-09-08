@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  claude-proxy:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VLLM_ENDPOINT=${VLLM_ENDPOINT}
+      - VLLM_API_KEY=${VLLM_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      - ALLOWED_API_KEYS=${ALLOWED_API_KEYS}
+      - CACHE_ENABLED=${CACHE_ENABLED:-true}
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+      - DEEPSEEK_THINKING=${DEEPSEEK_THINKING:-false}
+      - RATE_LIMIT=${RATE_LIMIT:-60}
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - claude-proxy-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - claude-proxy-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - claude-proxy-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - claude-proxy-network
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  claude-proxy-network:
+    driver: bridge

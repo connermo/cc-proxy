@@ -1,0 +1,43 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 4
+  log_level: "INFO"
+  
+vllm:
+  endpoint: "http://localhost:8000/v1"
+  api_key: "vllm-api-key"
+  timeout: 300
+  max_retries: 3
+  
+deepseek:
+  model_name: "deepseek-v3.1"
+  default_thinking: false
+  max_tokens: 8192
+  temperature: 0.7
+  top_p: 0.8
+  frequency_penalty: 0.1
+  presence_penalty: 0.0
+  
+cache:
+  enabled: true
+  redis_url: "redis://localhost:6379"
+  default_ttl: 3600
+  max_memory_cache_size: 1000
+  
+auth:
+  require_api_key: true
+  allowed_keys: []
+  rate_limit_requests_per_minute: 60
+  
+monitoring:
+  enable_metrics: true
+  enable_health_check: true
+  prometheus_port: 9090
+  
+logging:
+  level: "INFO"
+  format: "json"
+  file: "logs/proxy.log"
+  max_size: "100MB"
+  backup_count: 5
