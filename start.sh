@@ -1,20 +1,20 @@
 #!/bin/bash
 
-# Claude-DeepSeek Proxy Startup Script (Remote vLLM)
+# Claude-DeepSeek Proxy Startup Script (OpenAI Gateway)
 
 set -e
 
-echo "🚀 Starting Claude-DeepSeek Proxy with Remote vLLM..."
+echo "🚀 Starting Claude-DeepSeek Proxy with OpenAI Gateway..."
 
 # Check if .env exists
 if [ ! -f .env ]; then
     echo "⚠️  .env file not found. Creating from template..."
     cp .env.example .env
-    echo "✅ Please edit .env file with your remote vLLM configuration and run again."
+    echo "✅ Please edit .env file with your OpenAI gateway configuration and run again."
     echo ""
     echo "🔧 Required configuration:"
-    echo "   VLLM_ENDPOINT=https://your-vllm-server.com/v1"
-    echo "   VLLM_API_KEY=your-remote-vllm-api-key"
+    echo "   OPENAI_BASE_URL=https://your-openai-gateway.com/v1"
+    echo "   OPENAI_API_KEY=your-gateway-api-key"
     echo "   ALLOWED_API_KEYS=sk-your-claude-api-key"
     exit 1
 fi
