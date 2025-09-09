@@ -4,9 +4,9 @@ server:
   workers: 4
   log_level: "INFO"
   
-vllm:
-  endpoint: "http://localhost:8000/v1"
-  api_key: "vllm-api-key"
+openai:
+  base_url: "https://your-openai-gateway.com/v1"
+  api_key: "your-gateway-api-key"
   timeout: 300
   max_retries: 3
   

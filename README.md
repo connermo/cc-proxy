@@ -1,6 +1,6 @@
 # Claude-DeepSeek Proxy
 
-A high-performance proxy service that adapts Claude API calls to work with DeepSeek-V3.1 via vLLM, providing seamless integration between Claude Code and DeepSeek models.
+A high-performance proxy service that adapts Claude API calls to work with DeepSeek-V3.1 via OpenAI-compatible gateways, providing seamless integration between Claude Code and DeepSeek models.
 
 ## Features
 
@@ -8,23 +8,15 @@ A high-performance proxy service that adapts Claude API calls to work with DeepS
 - **Tool Calling Support**: Seamless adaptation of Claude tool calls to OpenAI function calling
 - **Streaming Responses**: Real-time streaming with proper SSE format conversion
 - **DeepSeek Optimization**: Automatic thinking mode detection and parameter optimization
-- **Intelligent Caching**: Redis-backed caching with intelligent TTL management
-- **Comprehensive Monitoring**: Prometheus metrics and Grafana dashboards
 - **Production Ready**: Authentication, rate limiting, error handling, and health checks
 
 ## Architecture
 
 ```
-┌─────────────┐    ┌─────────────────┐    ┌──────────┐    ┌─────────────┐
-│ Claude Code │───▶│ Claude-DeepSeek │───▶│   vLLM   │───▶│ DeepSeek-V3 │
-│             │    │     Proxy       │    │  Server  │    │             │
-└─────────────┘    └─────────────────┘    └──────────┘    └─────────────┘
-                            │
-                            ▼
-                    ┌─────────────────┐
-                    │ Redis Cache +   │
-                    │ Monitoring      │
-                    └─────────────────┘
+┌─────────────┐    ┌─────────────────┐    ┌──────────────┐    ┌─────────────┐
+│ Claude Code │───▶│ Claude-DeepSeek │───▶│ OpenAI       │───▶│ DeepSeek-V3 │
+│             │    │     Proxy       │    │ Gateway      │    │             │
+└─────────────┘    └─────────────────┘    └──────────────┘    └─────────────┘
 ```
 
 ## Quick Start
@@ -32,8 +24,8 @@ A high-performance proxy service that adapts Claude API calls to work with DeepS
 ### 1. Prerequisites
 
 - Docker and Docker Compose
-- 已部署的vLLM + DeepSeek-V3.1服务（远程）
-- vLLM服务的API端点和密钥
+- OpenAI兼容的DeepSeek网关服务
+- 网关的API端点和密钥
 
 ### 2. Setup
 
@@ -44,7 +36,7 @@ cd claude-deepseek-proxy
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env with your remote vLLM settings
+# Edit .env with your OpenAI gateway settings
 
 # Start services
 ./start.sh
@@ -67,29 +59,28 @@ claude-code "Hello, can you help me write a Python function?"
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VLLM_ENDPOINT` | Remote vLLM server endpoint | `https://your-vllm-server.com/v1` |
-| `VLLM_API_KEY` | Remote vLLM API key | Required |
+| `OPENAI_BASE_URL` | OpenAI compatible gateway endpoint | `https://your-gateway.com/v1` |
+| `OPENAI_API_KEY` | Gateway API key | Required |
 | `ALLOWED_API_KEYS` | Comma-separated Claude API keys | Required |
-| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `DEEPSEEK_THINKING` | Enable thinking mode | `false` |
-| `RATE_LIMIT` | Requests per minute | `60` |
+| `LOG_LEVEL` | Log level | `INFO` |
 
 ### Advanced Configuration
 
 Edit `config/default.yaml` for fine-tuned control:
 
 ```yaml
+openai:
+  base_url: "https://your-gateway.com/v1"
+  api_key: "your-gateway-api-key"
+  timeout: 300
+
 deepseek:
   model_name: "deepseek-v3.1"
   default_thinking: false
   max_tokens: 8192
   temperature: 0.7
-  
-cache:
-  enabled: true
-  default_ttl: 3600
-  max_memory_cache_size: 1000
-  
+
 auth:
   require_api_key: true
   rate_limit_requests_per_minute: 60

@@ -16,10 +16,10 @@ class ServerConfig(BaseModel):
     log_level: str = "INFO"
 
 
-class VLLMConfig(BaseModel):
-    """vLLM service configuration"""
-    endpoint: str = "http://localhost:8000/v1"
-    api_key: str = "vllm-api-key"
+class OpenAIConfig(BaseModel):
+    """OpenAI compatible service configuration"""
+    base_url: str = "https://your-openai-gateway.com/v1"
+    api_key: str = "your-gateway-api-key"
     timeout: int = 300
     max_retries: int = 3
 
@@ -69,7 +69,7 @@ class LoggingConfig(BaseModel):
 class Config(BaseSettings):
     """Main configuration"""
     server: ServerConfig = Field(default_factory=ServerConfig)
-    vllm: VLLMConfig = Field(default_factory=VLLMConfig)
+    openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     deepseek: DeepSeekConfig = Field(default_factory=DeepSeekConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
@@ -136,9 +136,9 @@ class ConfigManager:
             "SERVER_WORKERS": ["server", "workers"],
             "LOG_LEVEL": ["server", "log_level"],
             
-            "VLLM_ENDPOINT": ["vllm", "endpoint"],
-            "VLLM_API_KEY": ["vllm", "api_key"],
-            "VLLM_TIMEOUT": ["vllm", "timeout"],
+            "OPENAI_BASE_URL": ["openai", "base_url"],
+            "OPENAI_API_KEY": ["openai", "api_key"],
+            "OPENAI_TIMEOUT": ["openai", "timeout"],
             
             "DEEPSEEK_MODEL": ["deepseek", "model_name"],
             "DEEPSEEK_THINKING": ["deepseek", "default_thinking"],

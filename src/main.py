@@ -80,15 +80,16 @@ async def lifespan(app: FastAPI):
         enable_cleanup_closed=True
     )
     
-    timeout = aiohttp.ClientTimeout(total=config_manager.config.vllm.timeout)
+    timeout = aiohttp.ClientTimeout(total=config_manager.config.openai.timeout)
     http_client = aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
-        headers={"Authorization": f"Bearer {config_manager.config.vllm.api_key}"}
+        headers={"Authorization": f"Bearer {config_manager.config.openai.api_key}"}
     )
     
-    # Initialize cache
-    await cache_manager.initialize()
+    # Initialize cache if enabled
+    if config_manager.config.cache.enabled:
+        await cache_manager.initialize()
     
     logger.info("Proxy server started successfully")
     
@@ -100,7 +101,8 @@ async def lifespan(app: FastAPI):
     if http_client:
         await http_client.close()
         
-    await cache_manager.close()
+    if config_manager.config.cache.enabled:
+        await cache_manager.close()
     
     logger.info("Proxy server shutdown complete")
 
@@ -180,8 +182,9 @@ async def create_message(
                    stream=claude_request.get("stream", False),
                    has_tools=bool(claude_request.get("tools")))
         
-        # Check cache first
-        if not claude_request.get("stream", False):
+        # Check cache first if enabled
+        cache_key = None
+        if not claude_request.get("stream", False) and config_manager.config.cache.enabled:
             cache_key = cache_manager.generate_cache_key(claude_request)
             cached_response = await cache_manager.get_cached_response(cache_key)
             if cached_response:
@@ -197,14 +200,14 @@ async def create_message(
         # Apply thinking mode if needed
         openai_request = deepseek_features.enable_thinking_mode(openai_request)
         
-        # Make request to vLLM
-        vllm_endpoint = f"{config_manager.config.vllm.endpoint}/chat/completions"
+        # Make request to OpenAI compatible endpoint
+        openai_endpoint = f"{config_manager.config.openai.base_url}/chat/completions"
         
         if claude_request.get("stream", False):
-            return await handle_streaming_request(openai_request, vllm_endpoint, request_id)
+            return await handle_streaming_request(openai_request, openai_endpoint, request_id)
         else:
             return await handle_non_streaming_request(
-                openai_request, vllm_endpoint, request_id, cache_key if 'cache_key' in locals() else None
+                openai_request, openai_endpoint, request_id, cache_key
             )
             
     except Exception as e:
@@ -221,7 +224,7 @@ async def create_message(
 
 async def handle_streaming_request(
     openai_request: Dict[str, Any],
-    vllm_endpoint: str,
+    openai_endpoint: str,
     request_id: str
 ) -> StreamingResponse:
     """Handle streaming request"""
@@ -229,18 +232,18 @@ async def handle_streaming_request(
     async def stream_generator():
         try:
             async with http_client.post(
-                vllm_endpoint,
+                openai_endpoint,
                 json=openai_request,
                 headers={"Accept": "text/event-stream"}
             ) as response:
                 
                 if response.status != 200:
                     error_text = await response.text()
-                    logger.error("vLLM request failed",
+                    logger.error("OpenAI gateway request failed",
                                request_id=request_id,
                                status=response.status,
                                error=error_text)
-                    yield f"data: {{'error': 'vLLM request failed'}}\n\n"
+                    yield f"data: {{'error': 'OpenAI gateway request failed'}}\n\n"
                     return
                 
                 # Process stream
@@ -265,18 +268,18 @@ async def handle_streaming_request(
 
 async def handle_non_streaming_request(
     openai_request: Dict[str, Any],
-    vllm_endpoint: str, 
+    openai_endpoint: str, 
     request_id: str,
     cache_key: Optional[str] = None
 ) -> JSONResponse:
     """Handle non-streaming request"""
     
     try:
-        async with http_client.post(vllm_endpoint, json=openai_request) as response:
+        async with http_client.post(openai_endpoint, json=openai_request) as response:
             
             if response.status != 200:
                 error_text = await response.text()
-                logger.error("vLLM request failed",
+                logger.error("OpenAI gateway request failed",
                            request_id=request_id,
                            status=response.status,
                            error=error_text)
@@ -291,8 +294,9 @@ async def handle_non_streaming_request(
             # Convert to Claude format
             claude_response = message_converter.openai_to_claude_response(processed_response)
             
-            # Cache response if applicable
-            if cache_key and cache_manager.should_cache_request(openai_request):
+            # Cache response if applicable and enabled
+            if (cache_key and config_manager.config.cache.enabled and 
+                cache_manager.should_cache_request(openai_request)):
                 await cache_manager.cache_response(cache_key, claude_response)
             
             logger.info("Request processed successfully",
@@ -319,7 +323,7 @@ async def handle_non_streaming_request(
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    health_status = await health_checker.check_vllm_health()
+    health_status = await health_checker.check_openai_health()
     
     if health_status["status"] == "healthy":
         return health_status
@@ -330,13 +334,18 @@ async def health_check():
 @app.get("/metrics")
 async def get_metrics():
     """Get service metrics"""
-    return {
+    metrics = {
         "proxy_metrics": metrics_collector.get_metrics(),
-        "cache_metrics": cache_manager.get_metrics(),
         "stream_metrics": stream_processor.get_active_streams(),
         "deepseek_metrics": response_processor.metrics.get_metrics(),
         "tool_metrics": tool_result_handler.get_execution_stats()
     }
+    
+    # Add cache metrics if enabled
+    if config_manager.config.cache.enabled:
+        metrics["cache_metrics"] = await cache_manager.get_metrics()
+        
+    return metrics
 
 
 @app.get("/v1/models")

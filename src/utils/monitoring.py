@@ -161,15 +161,15 @@ class HealthChecker:
         self.last_redis_check = None
         self.check_cache = {}
         
-    async def check_vllm_health(self, endpoint: str = None, api_key: str = None) -> Dict[str, Any]:
-        """Check vLLM service health"""
-        if not endpoint:
+    async def check_openai_health(self, base_url: str = None, api_key: str = None) -> Dict[str, Any]:
+        """Check OpenAI compatible service health"""
+        if not base_url:
             from src.utils.config import ConfigManager
             config = ConfigManager().config
-            endpoint = config.vllm.endpoint
-            api_key = config.vllm.api_key
+            base_url = config.openai.base_url
+            api_key = config.openai.api_key
             
-        cache_key = f"vllm_health_{endpoint}"
+        cache_key = f"openai_health_{base_url}"
         now = time.time()
         
         # Use cached result if recent (within 30 seconds)
@@ -185,13 +185,13 @@ class HealthChecker:
                 
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
                 # Try health endpoint first
-                health_url = f"{endpoint.rstrip('/v1')}/health"
+                health_url = f"{base_url.rstrip('/v1')}/health"
                 try:
                     async with session.get(health_url, headers=headers) as response:
                         if response.status == 200:
                             result = {
                                 "status": "healthy",
-                                "endpoint": endpoint,
+                                "endpoint": base_url,
                                 "response_time": time.time() - now,
                                 "details": "Health endpoint responded successfully"
                             }
@@ -201,7 +201,7 @@ class HealthChecker:
                     pass  # Try models endpoint as fallback
                     
                 # Try models endpoint as fallback
-                models_url = f"{endpoint}/models"
+                models_url = f"{base_url}/models"
                 async with session.get(models_url, headers=headers) as response:
                     response_time = time.time() - now
                     
@@ -209,7 +209,7 @@ class HealthChecker:
                         data = await response.json()
                         result = {
                             "status": "healthy",
-                            "endpoint": endpoint,
+                            "endpoint": base_url,
                             "response_time": response_time,
                             "models_available": len(data.get("data", [])),
                             "details": "Models endpoint responded successfully"
@@ -217,7 +217,7 @@ class HealthChecker:
                     else:
                         result = {
                             "status": "unhealthy",
-                            "endpoint": endpoint,
+                            "endpoint": base_url,
                             "response_time": response_time,
                             "error": f"HTTP {response.status}",
                             "details": await response.text()
@@ -226,14 +226,14 @@ class HealthChecker:
         except asyncio.TimeoutError:
             result = {
                 "status": "unhealthy", 
-                "endpoint": endpoint,
+                "endpoint": base_url,
                 "error": "timeout",
                 "details": "Request timed out after 10 seconds"
             }
         except Exception as e:
             result = {
                 "status": "unhealthy",
-                "endpoint": endpoint, 
+                "endpoint": base_url, 
                 "error": type(e).__name__,
                 "details": str(e)
             }
@@ -298,11 +298,11 @@ class HealthChecker:
         
         results = {}
         
-        # Check vLLM
+        # Check OpenAI compatible service
         try:
-            results["vllm"] = await self.check_vllm_health()
+            results["openai_gateway"] = await self.check_openai_health()
         except Exception as e:
-            results["vllm"] = {
+            results["openai_gateway"] = {
                 "status": "error",
                 "error": str(e)
             }
