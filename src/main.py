@@ -200,6 +200,7 @@ async def create_message(
         
         
         # Convert Claude request to OpenAI format
+        conversion_start = asyncio.get_event_loop().time()
         openai_request = message_converter.claude_to_openai_request(claude_request)
         
         # Apply DeepSeek optimizations
@@ -207,9 +208,15 @@ async def create_message(
         
         # Apply thinking mode if needed
         openai_request = deepseek_features.enable_thinking_mode(openai_request)
+        conversion_time = asyncio.get_event_loop().time() - conversion_start
         
         # Make request to OpenAI compatible endpoint
         openai_endpoint = f"{config_manager.config.openai.base_url}/chat/completions"
+        
+        logger.debug("Request conversion completed", 
+                    request_id=request_id,
+                    conversion_time_ms=conversion_time * 1000,
+                    final_max_tokens=openai_request.get("max_tokens"))
         
         if claude_request.get("stream", False):
             logger.info("Processing streaming request", request_id=request_id)
@@ -243,11 +250,17 @@ async def handle_streaming_request(
     
     async def stream_generator():
         try:
+            gateway_start = asyncio.get_event_loop().time()
             async with http_client.post(
                 openai_endpoint,
                 json=openai_request,
                 headers={"Accept": "text/event-stream"}
             ) as response:
+                gateway_connection_time = asyncio.get_event_loop().time() - gateway_start
+                logger.debug("Gateway connection established", 
+                           request_id=request_id,
+                           connection_time_ms=gateway_connection_time * 1000,
+                           status=response.status)
                 
                 if response.status != 200:
                     error_text = await response.text()
