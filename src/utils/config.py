@@ -26,6 +26,8 @@ class OpenAIConfig(BaseModel):
 
 class DeepSeekConfig(BaseModel):
     """DeepSeek model configuration"""
+    model_config = {"protected_namespaces": ()}
+    
     model_name: str = "deepseek-v3.1"
     default_thinking: bool = False
     max_tokens: int = 8192
