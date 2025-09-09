@@ -32,6 +32,15 @@ class MessageConverter:
             return config.deepseek.model_name
         except Exception:
             return "deepseek-v3.1"  # Fallback
+            
+    def _get_max_tokens_limit(self) -> int:
+        """Get max tokens limit from config"""
+        try:
+            from src.utils.config import ConfigManager
+            config = ConfigManager().config
+            return config.deepseek.max_tokens
+        except Exception:
+            return 8192  # Safe fallback
         
     def claude_to_openai_request(self, claude_request: Dict[str, Any]) -> Dict[str, Any]:
         """Convert Claude request format to OpenAI format"""
@@ -41,7 +50,7 @@ class MessageConverter:
         openai_request = {
             "model": self._get_model_name(),
             "messages": [],
-            "max_tokens": claude_request.get("max_tokens", 4096),
+            "max_tokens": min(claude_request.get("max_tokens", 4096), self._get_max_tokens_limit()),
             "temperature": claude_request.get("temperature", 0.7),
             "stream": claude_request.get("stream", False)
         }
