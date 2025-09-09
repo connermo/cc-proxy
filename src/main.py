@@ -201,11 +201,14 @@ async def create_message(
     except Exception as e:
         logger.error("Error processing message request",
                     request_id=request_id,
-                    error=str(e))
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    traceback=True,
+                    exc_info=True)
         
         raise HTTPException(
             status_code=500,
-            detail={"error": {"type": "api_error", "message": "Internal server error"}}
+            detail={"error": {"type": "api_error", "message": f"Internal server error: {type(e).__name__}: {str(e)}"}}
         )
 
 
@@ -296,8 +299,11 @@ async def handle_non_streaming_request(
     except Exception as e:
         logger.error("Unexpected error",
                     request_id=request_id,
-                    error=str(e))
-        raise HTTPException(status_code=500, detail="Internal server error")
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    traceback=True,
+                    exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {type(e).__name__}: {str(e)}")
 
 
 @app.get("/health")
