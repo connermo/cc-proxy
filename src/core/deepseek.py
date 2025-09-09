@@ -2,7 +2,7 @@
 DeepSeek-V3.1 specific features and optimizations
 """
 import re
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import structlog
 from enum import Enum
 
