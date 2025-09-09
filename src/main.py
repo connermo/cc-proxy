@@ -78,12 +78,15 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Claude-DeepSeek proxy server")
     
-    # Initialize HTTP client
+    # Initialize HTTP client with optimized settings for faster connections
     connector = aiohttp.TCPConnector(
         limit=100,
         limit_per_host=20,
-        keepalive_timeout=30,
-        enable_cleanup_closed=True
+        keepalive_timeout=60,  # Keep connections alive longer
+        enable_cleanup_closed=True,
+        force_close=False,  # Reuse connections
+        ttl_dns_cache=300,  # Cache DNS for 5 minutes
+        use_dns_cache=True
     )
     
     timeout = aiohttp.ClientTimeout(total=config_manager.config.openai.timeout)
