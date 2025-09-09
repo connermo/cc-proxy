@@ -22,6 +22,13 @@ from src.utils.config import ConfigManager
 from src.utils.auth import AuthManager
 
 # Initialize logging
+import logging
+import os
+
+# Set logging level from environment variable
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, log_level))
+
 structlog.configure(
     processors=[
         structlog.stdlib.filter_by_level,
@@ -40,6 +47,10 @@ structlog.configure(
 )
 
 logger = structlog.get_logger(__name__)
+
+# Test debug logging
+logger.debug("Debug logging is enabled", log_level=log_level)
+logger.info("Proxy server initializing", log_level=log_level)
 
 
 # Global instances
