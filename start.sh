@@ -64,7 +64,7 @@ fi
 
 echo "✅ Docker is running"
 
-# Build and start services (without local vLLM)
+# Build and start services
 echo "🔧 Building Docker images..."
 docker-compose build --no-cache
 

@@ -20,8 +20,6 @@ from src.core.streaming import StreamingHandler, AsyncStreamProcessor
 from src.core.deepseek import DeepSeekFeatures, ModelOptimizer, ResponseProcessor
 from src.utils.config import ConfigManager
 from src.utils.auth import AuthManager
-from src.utils.cache import CacheManager
-from src.utils.monitoring import MetricsCollector, HealthChecker
 
 # Initialize logging
 structlog.configure(
@@ -47,9 +45,6 @@ logger = structlog.get_logger(__name__)
 # Global instances
 config_manager = ConfigManager()
 auth_manager = AuthManager(config_manager.config)
-cache_manager = CacheManager(config_manager.config.cache)
-metrics_collector = MetricsCollector()
-health_checker = HealthChecker()
 
 # Core processors
 message_converter = MessageConverter()
@@ -60,7 +55,7 @@ model_optimizer = ModelOptimizer()
 response_processor = ResponseProcessor()
 stream_processor = AsyncStreamProcessor()
 
-# HTTP client for vLLM requests
+# HTTP client for OpenAI gateway requests
 http_client: Optional[aiohttp.ClientSession] = None
 
 
@@ -87,9 +82,6 @@ async def lifespan(app: FastAPI):
         headers={"Authorization": f"Bearer {config_manager.config.openai.api_key}"}
     )
     
-    # Initialize cache if enabled
-    if config_manager.config.cache.enabled:
-        await cache_manager.initialize()
     
     logger.info("Proxy server started successfully")
     
@@ -101,8 +93,6 @@ async def lifespan(app: FastAPI):
     if http_client:
         await http_client.close()
         
-    if config_manager.config.cache.enabled:
-        await cache_manager.close()
     
     logger.info("Proxy server shutdown complete")
 
@@ -110,7 +100,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Claude-DeepSeek Proxy",
-    description="Proxy server to adapt Claude API calls for DeepSeek-V3.1 via vLLM",
+    description="Proxy server to adapt Claude API calls for DeepSeek-V3.1 via OpenAI gateway",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -158,9 +148,6 @@ async def logging_middleware(request: Request, call_next):
                status_code=response.status_code,
                duration_ms=duration * 1000)
     
-    # Record metrics
-    metrics_collector.record_request(request.url.path, request.method)
-    metrics_collector.record_response_time(duration)
     
     return response
 
@@ -182,14 +169,6 @@ async def create_message(
                    stream=claude_request.get("stream", False),
                    has_tools=bool(claude_request.get("tools")))
         
-        # Check cache first if enabled
-        cache_key = None
-        if not claude_request.get("stream", False) and config_manager.config.cache.enabled:
-            cache_key = cache_manager.generate_cache_key(claude_request)
-            cached_response = await cache_manager.get_cached_response(cache_key)
-            if cached_response:
-                logger.info("Returning cached response", request_id=request_id)
-                return JSONResponse(cached_response)
         
         # Convert Claude request to OpenAI format
         openai_request = message_converter.claude_to_openai_request(claude_request)
@@ -207,14 +186,13 @@ async def create_message(
             return await handle_streaming_request(openai_request, openai_endpoint, request_id)
         else:
             return await handle_non_streaming_request(
-                openai_request, openai_endpoint, request_id, cache_key
+                openai_request, openai_endpoint, request_id
             )
             
     except Exception as e:
         logger.error("Error processing message request",
                     request_id=request_id,
                     error=str(e))
-        metrics_collector.record_error("message_processing_error")
         
         raise HTTPException(
             status_code=500,
@@ -270,7 +248,6 @@ async def handle_non_streaming_request(
     openai_request: Dict[str, Any],
     openai_endpoint: str, 
     request_id: str,
-    cache_key: Optional[str] = None
 ) -> JSONResponse:
     """Handle non-streaming request"""
     
@@ -294,10 +271,6 @@ async def handle_non_streaming_request(
             # Convert to Claude format
             claude_response = message_converter.openai_to_claude_response(processed_response)
             
-            # Cache response if applicable and enabled
-            if (cache_key and config_manager.config.cache.enabled and 
-                cache_manager.should_cache_request(openai_request)):
-                await cache_manager.cache_response(cache_key, claude_response)
             
             logger.info("Request processed successfully",
                        request_id=request_id,
@@ -309,43 +282,31 @@ async def handle_non_streaming_request(
         logger.error("HTTP client error",
                     request_id=request_id,
                     error=str(e))
-        metrics_collector.record_error("http_client_error")
         raise HTTPException(status_code=502, detail="Upstream service error")
     
     except Exception as e:
         logger.error("Unexpected error",
                     request_id=request_id,
                     error=str(e))
-        metrics_collector.record_error("unexpected_error")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    health_status = await health_checker.check_openai_health()
-    
-    if health_status["status"] == "healthy":
-        return health_status
-    else:
-        raise HTTPException(status_code=503, detail=health_status)
-
-
-@app.get("/metrics")
-async def get_metrics():
-    """Get service metrics"""
-    metrics = {
-        "proxy_metrics": metrics_collector.get_metrics(),
-        "stream_metrics": stream_processor.get_active_streams(),
-        "deepseek_metrics": response_processor.metrics.get_metrics(),
-        "tool_metrics": tool_result_handler.get_execution_stats()
+    return {
+        "service": "Claude-DeepSeek Proxy", 
+        "status": "healthy"
     }
-    
-    # Add cache metrics if enabled
-    if config_manager.config.cache.enabled:
-        metrics["cache_metrics"] = await cache_manager.get_metrics()
-        
-    return metrics
+
+
+@app.get("/status")
+async def get_status():
+    """Get service status (basic info only)"""
+    return {
+        "service": "Claude-DeepSeek Proxy",
+        "status": "running"
+    }
 
 
 @app.get("/v1/models")
@@ -378,7 +339,7 @@ async def root():
             "messages": "/v1/messages",
             "models": "/v1/models", 
             "health": "/health",
-            "metrics": "/metrics"
+            "status": "/status"
         }
     }
 

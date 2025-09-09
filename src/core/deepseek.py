@@ -256,60 +256,13 @@ class ModelOptimizer:
         return recommendations[task_type]
 
 
-class DeepSeekMetrics:
-    """Collect metrics specific to DeepSeek features"""
-    
-    def __init__(self):
-        self.thinking_mode_usage = 0
-        self.task_type_counts = {task_type: 0 for task_type in TaskType}
-        self.thinking_response_lengths = []
-        self.optimization_counts = 0
-        
-    def record_thinking_usage(self, enabled: bool, response_length: int = 0):
-        """Record thinking mode usage"""
-        if enabled:
-            self.thinking_mode_usage += 1
-            if response_length > 0:
-                self.thinking_response_lengths.append(response_length)
-                
-    def record_task_type(self, task_type: TaskType):
-        """Record detected task type"""
-        self.task_type_counts[task_type] += 1
-        
-    def record_optimization(self):
-        """Record parameter optimization"""
-        self.optimization_counts += 1
-        
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get DeepSeek-specific metrics"""
-        avg_thinking_length = (
-            sum(self.thinking_response_lengths) / len(self.thinking_response_lengths)
-            if self.thinking_response_lengths else 0
-        )
-        
-        total_requests = sum(self.task_type_counts.values())
-        
-        return {
-            "thinking_mode_usage": self.thinking_mode_usage,
-            "thinking_usage_rate": (
-                self.thinking_mode_usage / total_requests 
-                if total_requests > 0 else 0
-            ),
-            "average_thinking_response_length": avg_thinking_length,
-            "task_type_distribution": {
-                task_type.value: count 
-                for task_type, count in self.task_type_counts.items()
-            },
-            "optimization_counts": self.optimization_counts,
-            "total_requests": total_requests
-        }
         
         
 class ResponseProcessor:
     """Process DeepSeek responses for Claude compatibility"""
     
     def __init__(self):
-        self.metrics = DeepSeekMetrics()
+        pass
         
     def process_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Process DeepSeek response"""
@@ -328,8 +281,6 @@ class ResponseProcessor:
         thinking, answer = deepseek.parse_thinking_response(content)
         
         if thinking:
-            # Record thinking usage
-            self.metrics.record_thinking_usage(True, len(thinking))
             
             # Format for Claude
             formatted_content = deepseek.format_thinking_for_claude(thinking, answer)

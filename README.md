@@ -129,39 +129,15 @@ Automatic parameter tuning based on task type:
 | Creative | 0.8 | 0.95 | ❌ |
 | Analysis | 0.2 | 0.85 | ✅ |
 
-## Monitoring
-
-### Metrics Available
-
-- Request/response metrics
-- Cache hit rates
-- DeepSeek feature usage
-- Tool execution statistics
-- Error rates and types
-
-### Accessing Dashboards
-
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Proxy Metrics**: http://localhost:8080/metrics
-
 ## Performance
-
-### Caching Strategy
-
-- **Memory Cache**: Fast access for recent requests
-- **Redis Cache**: Persistent cache across restarts
-- **Smart TTL**: Different cache times based on content type
-- **Cache Keys**: SHA-256 hashed request fingerprints
 
 ### Expected Performance
 
 | Metric | Value |
 |--------|-------|
-| Cache Hit Rate | 30-60% (depends on usage) |
-| Response Time | <2s (cached), <10s (uncached) |
+| Response Time | 1-5s (depends on gateway latency) |
 | Throughput | 10-50 RPS (depends on hardware) |
-| Memory Usage | ~500MB (proxy only) |
+| Memory Usage | ~200MB (lightweight proxy) |
 
 ## Development
 
@@ -171,12 +147,7 @@ Automatic parameter tuning based on task type:
 # Install dependencies
 pip install -r requirements.txt
 
-# Start Redis
-docker run -d -p 6379:6379 redis:7-alpine
-
-# Start vLLM separately (see vLLM docs)
-
-# Run proxy
+# Run proxy directly
 python -m src.main
 ```
 
@@ -191,9 +162,7 @@ src/
 │   └── deepseek.py    # DeepSeek-specific features
 ├── utils/          # Utilities
 │   ├── config.py      # Configuration management
-│   ├── auth.py        # Authentication & rate limiting
-│   ├── cache.py       # Caching system
-│   └── monitoring.py  # Metrics & health checks
+│   └── auth.py        # Authentication & rate limiting
 └── main.py         # FastAPI application
 ```
 
@@ -217,25 +186,20 @@ curl -X POST http://localhost:8080/v1/messages \
 
 ### Common Issues
 
-1. **vLLM Connection Failed**
-   - Check GPU availability: `nvidia-smi`
-   - Verify vLLM is running: `curl http://localhost:8000/health`
-   - Check model loading: `docker-compose logs vllm`
+1. **OpenAI Gateway Connection Failed**
+   - Check gateway accessibility: `curl $OPENAI_BASE_URL/health`
+   - Verify OPENAI_BASE_URL is correct
+   - Ensure OPENAI_API_KEY is valid
 
 2. **Authentication Errors**
    - Verify API key in environment variables
    - Check allowed keys configuration
    - Ensure proper Bearer token format
 
-3. **Cache Issues**
-   - Check Redis connection: `redis-cli ping`
-   - Verify Redis URL configuration
-   - Check Redis logs: `docker-compose logs redis`
-
-4. **Performance Issues**
-   - Monitor GPU utilization
-   - Check cache hit rates at `/metrics`
-   - Adjust batch sizes and concurrent requests
+3. **Performance Issues**
+   - Check network latency to gateway
+   - Monitor response times in logs
+   - Adjust request timeouts in configuration
 
 ### Debug Mode
 
@@ -261,17 +225,12 @@ docker-compose up
 
 - **Horizontal**: Run multiple proxy instances behind load balancer
 - **Vertical**: Increase resources for individual services
-- **Caching**: Use Redis Cluster for large-scale caching
-- **Monitoring**: Set up alerting for key metrics
-
 ### Resource Requirements
 
-| Component | CPU | RAM | Storage | GPU |
-|-----------|-----|-----|---------|-----|
-| Proxy | 2-4 cores | 2-4 GB | 10 GB | - |
-| vLLM | 16+ cores | 32+ GB | 100+ GB | 8x H100 |
-| Redis | 1-2 cores | 2-8 GB | 50+ GB | - |
-| Monitoring | 1-2 cores | 2-4 GB | 20+ GB | - |
+| Component | CPU | RAM | Storage | Notes |
+|-----------|-----|-----|---------|-------|
+| Proxy | 1-2 cores | 1-2 GB | 5 GB | Lightweight service |
+| Gateway | Varies | Varies | Varies | Managed externally |
 
 ## License
 

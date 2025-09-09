@@ -35,12 +35,6 @@ class DeepSeekConfig(BaseModel):
     presence_penalty: float = 0.0
 
 
-class CacheConfig(BaseModel):
-    """Cache configuration"""
-    enabled: bool = True
-    redis_url: str = "redis://localhost:6379"
-    default_ttl: int = 3600
-    max_memory_cache_size: int = 1000
 
 
 class AuthConfig(BaseModel):
@@ -50,11 +44,6 @@ class AuthConfig(BaseModel):
     rate_limit_requests_per_minute: int = 60
 
 
-class MonitoringConfig(BaseModel):
-    """Monitoring configuration"""
-    enable_metrics: bool = True
-    enable_health_check: bool = True
-    prometheus_port: int = 9090
 
 
 class LoggingConfig(BaseModel):
@@ -71,9 +60,7 @@ class Config(BaseSettings):
     server: ServerConfig = Field(default_factory=ServerConfig)
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     deepseek: DeepSeekConfig = Field(default_factory=DeepSeekConfig)
-    cache: CacheConfig = Field(default_factory=CacheConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
-    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     class Config:
@@ -145,15 +132,10 @@ class ConfigManager:
             "DEEPSEEK_MAX_TOKENS": ["deepseek", "max_tokens"],
             "DEEPSEEK_TEMPERATURE": ["deepseek", "temperature"],
             
-            "REDIS_URL": ["cache", "redis_url"],
-            "CACHE_ENABLED": ["cache", "enabled"],
-            "CACHE_TTL": ["cache", "default_ttl"],
             
             "REQUIRE_API_KEY": ["auth", "require_api_key"],
             "RATE_LIMIT": ["auth", "rate_limit_requests_per_minute"],
             
-            "ENABLE_METRICS": ["monitoring", "enable_metrics"],
-            "PROMETHEUS_PORT": ["monitoring", "prometheus_port"]
         }
         
         for env_var, config_path in env_mappings.items():
@@ -232,9 +214,9 @@ class ConfigManager:
         """Validate configuration and return any issues"""
         issues = []
         
-        # Validate vLLM endpoint
-        if not self.config.vllm.endpoint.startswith(("http://", "https://")):
-            issues.append("vLLM endpoint must be a valid HTTP/HTTPS URL")
+        # Validate OpenAI gateway endpoint
+        if not self.config.openai.base_url.startswith(("http://", "https://")):
+            issues.append("OpenAI gateway endpoint must be a valid HTTP/HTTPS URL")
             
         # Validate ports
         if not (1 <= self.config.server.port <= 65535):
@@ -250,8 +232,5 @@ class ConfigManager:
         if not (0.0 <= self.config.deepseek.top_p <= 1.0):
             issues.append("top_p must be between 0.0 and 1.0")
             
-        # Validate cache settings
-        if self.config.cache.enabled and not self.config.cache.redis_url:
-            issues.append("Redis URL is required when caching is enabled")
             
         return issues
