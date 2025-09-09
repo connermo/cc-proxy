@@ -192,8 +192,10 @@ async def create_message(
         openai_endpoint = f"{config_manager.config.openai.base_url}/chat/completions"
         
         if claude_request.get("stream", False):
+            logger.info("Processing streaming request", request_id=request_id)
             return await handle_streaming_request(openai_request, openai_endpoint, request_id)
         else:
+            logger.info("Processing non-streaming request", request_id=request_id)
             return await handle_non_streaming_request(
                 openai_request, openai_endpoint, request_id
             )
