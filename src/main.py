@@ -121,7 +121,7 @@ security = HTTPBearer()
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validate API key"""
     api_key = credentials.credentials
-    logger.info("Validating API key", 
+    logger.debug("Validating API key", 
                 key_prefix=api_key[:12] + "..." if len(api_key) > 12 else api_key,
                 configured_keys=[key[:12] + "..." for key in config_manager.config.auth.allowed_keys])
     
@@ -130,7 +130,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                       key_prefix=api_key[:12] + "..." if len(api_key) > 12 else api_key)
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    logger.info("API key validated successfully")
+    logger.debug("API key validated successfully")
     return api_key
 
 
@@ -144,6 +144,8 @@ async def logging_middleware(request: Request, call_next):
                request_id=request_id,
                method=request.method,
                path=request.url.path,
+               query_params=str(request.query_params),
+               headers={k: v for k, v in request.headers.items() if k.lower() not in ['authorization']},
                client_ip=request.client.host)
     
     # Process request
@@ -169,6 +171,11 @@ async def create_message(
     """Handle Claude messages API"""
     request_id = str(uuid.uuid4())
     
+    logger.info("Received request at /v1/messages endpoint", 
+                request_id=request_id,
+                method=request.method,
+                content_type=request.headers.get("content-type"))
+    
     try:
         # Parse request
         claude_request = await request.json()
@@ -176,7 +183,9 @@ async def create_message(
         logger.info("Processing Claude messages request",
                    request_id=request_id,
                    stream=claude_request.get("stream", False),
-                   has_tools=bool(claude_request.get("tools")))
+                   has_tools=bool(claude_request.get("tools")),
+                   message_count=len(claude_request.get("messages", [])),
+                   max_tokens=claude_request.get("max_tokens"))
         
         
         # Convert Claude request to OpenAI format
