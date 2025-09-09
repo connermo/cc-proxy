@@ -234,7 +234,7 @@ docker-compose up
 
 ## License
 
-[Your License Here]
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
