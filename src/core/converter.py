@@ -50,7 +50,7 @@ class MessageConverter:
         openai_request = {
             "model": self._get_model_name(),
             "messages": [],
-            "max_tokens": min(claude_request.get("max_tokens", 4096), self._get_max_tokens_limit()),
+            "max_tokens": min(claude_request.get("max_tokens", 8192), self._get_max_tokens_limit()),
             "temperature": claude_request.get("temperature", 0.7),
             "stream": claude_request.get("stream", False)
         }
