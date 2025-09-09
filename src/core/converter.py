@@ -24,13 +24,22 @@ class MessageConverter:
             "stream": "stream"
         }
         
+    def _get_model_name(self) -> str:
+        """Get model name from config"""
+        try:
+            from src.utils.config import ConfigManager
+            config = ConfigManager().config
+            return config.deepseek.model_name
+        except Exception:
+            return "deepseek-v3.1"  # Fallback
+        
     def claude_to_openai_request(self, claude_request: Dict[str, Any]) -> Dict[str, Any]:
         """Convert Claude request format to OpenAI format"""
         request_id = str(uuid.uuid4())
         logger.info("Converting Claude request to OpenAI format", request_id=request_id)
         
         openai_request = {
-            "model": "deepseek-v3.1",  # Default model name
+            "model": self._get_model_name(),
             "messages": [],
             "max_tokens": claude_request.get("max_tokens", 4096),
             "temperature": claude_request.get("temperature", 0.7),
@@ -167,7 +176,7 @@ class MessageConverter:
             "id": f"msg_{response_id}",
             "type": "message",
             "role": "assistant",
-            "model": openai_response.get("model", "deepseek-v3.1"),
+            "model": openai_response.get("model", self._get_model_name()),
             "content": [],
             "stop_reason": self._convert_finish_reason(choice.get("finish_reason")),
             "usage": self._convert_usage(openai_response.get("usage", {}))

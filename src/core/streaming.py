@@ -25,6 +25,15 @@ class StreamingHandler:
     def __init__(self):
         self.buffer = StreamBuffer()
         
+    def _get_model_name(self) -> str:
+        """Get model name from config"""
+        try:
+            from src.utils.config import ConfigManager
+            config = ConfigManager().config
+            return config.deepseek.model_name
+        except Exception:
+            return "deepseek-v3.1"  # Fallback
+        
     async def stream_openai_to_claude(
         self, 
         openai_stream: AsyncIterator[bytes],
@@ -41,7 +50,7 @@ class StreamingHandler:
                     "id": f"msg_{request_id}",
                     "type": "message", 
                     "role": "assistant",
-                    "model": "deepseek-v3.1",
+                    "model": self._get_model_name(),
                     "content": [],
                     "usage": {"input_tokens": 0, "output_tokens": 0}
                 }
