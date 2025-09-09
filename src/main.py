@@ -213,10 +213,10 @@ async def create_message(
         # Make request to OpenAI compatible endpoint
         openai_endpoint = f"{config_manager.config.openai.base_url}/chat/completions"
         
-        logger.debug("Request conversion completed", 
-                    request_id=request_id,
-                    conversion_time_ms=conversion_time * 1000,
-                    final_max_tokens=openai_request.get("max_tokens"))
+        logger.info("Request conversion completed", 
+                   request_id=request_id,
+                   conversion_time_ms=conversion_time * 1000,
+                   final_max_tokens=openai_request.get("max_tokens"))
         
         if claude_request.get("stream", False):
             logger.info("Processing streaming request", request_id=request_id)
@@ -299,7 +299,15 @@ async def handle_non_streaming_request(
     """Handle non-streaming request"""
     
     try:
+        gateway_start = asyncio.get_event_loop().time()
+        logger.info("Starting gateway request", request_id=request_id, endpoint=openai_endpoint)
+        
         async with http_client.post(openai_endpoint, json=openai_request) as response:
+            gateway_time = asyncio.get_event_loop().time() - gateway_start
+            logger.info("Gateway response received", 
+                       request_id=request_id,
+                       gateway_time_ms=gateway_time * 1000,
+                       status=response.status)
             
             if response.status != 200:
                 error_text = await response.text()
