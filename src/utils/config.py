@@ -7,6 +7,14 @@ from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
+# Load .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, skip loading .env file
+    pass
+
 
 class ServerConfig(BaseModel):
     """Server configuration"""

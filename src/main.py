@@ -120,9 +120,18 @@ security = HTTPBearer()
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validate API key"""
-    if not auth_manager.validate_api_key(credentials.credentials):
+    api_key = credentials.credentials
+    logger.info("Validating API key", 
+                key_prefix=api_key[:12] + "..." if len(api_key) > 12 else api_key,
+                configured_keys=[key[:12] + "..." for key in config_manager.config.auth.allowed_keys])
+    
+    if not auth_manager.validate_api_key(api_key):
+        logger.warning("API key validation failed", 
+                      key_prefix=api_key[:12] + "..." if len(api_key) > 12 else api_key)
         raise HTTPException(status_code=401, detail="Invalid API key")
-    return credentials.credentials
+    
+    logger.info("API key validated successfully")
+    return api_key
 
 
 @app.middleware("http")
